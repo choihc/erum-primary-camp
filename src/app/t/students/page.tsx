@@ -119,6 +119,7 @@ export default function StudentsPage() {
             contact: member.contact || '',
             role: member.role,
             is_leader: group?.leader === member.name,
+            created_at: member.created_at || new Date().toISOString(),
           };
         }
       );

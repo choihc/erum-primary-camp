@@ -65,7 +65,7 @@ export default function HomePage() {
                   학생, 학부모
                 </CardTitle>
                 <CardDescription className="text-sky-600">
-                  수련회 신청, 수련회 정보 확인 등
+                  성경학교 신청, 성경학교 정보 확인 등
                 </CardDescription>
               </CardHeader>
               <CardContent className="text-center">

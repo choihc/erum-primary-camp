@@ -29,7 +29,7 @@ const SCHEDULE: Program[] = [
     timeStr: '15:00 ~ 15:30',
   },
   {
-    title: '수련회장 도착',
+    title: '성경학교장 도착',
     startTime: new Date('2025-07-18T15:30:00'),
     endTime: new Date('2025-07-18T17:00:00'),
     date: '7월 18일',
@@ -192,7 +192,7 @@ export default function CurrentProgramStatus() {
       const now = FAKE_TIME || new Date();
       setCurrentTime(now);
 
-      // 수련회 종료 시간 (7월 20일 12:00)
+      // 성경학교 종료 시간 (7월 20일 12:00)
       const campEndTime = new Date('2025-07-20T12:00:00');
 
       if (now >= campEndTime) {
@@ -202,7 +202,7 @@ export default function CurrentProgramStatus() {
         return;
       }
 
-      // 수련회 시작 시간 (7월 18일 15:00)
+      // 성경학교 시작 시간 (7월 18일 15:00)
       const campStartTime = new Date('2025-07-18T15:00:00');
 
       if (now < campStartTime) {
@@ -269,10 +269,10 @@ export default function CurrentProgramStatus() {
         <CardContent className="p-6 text-center">
           <div className="space-y-4">
             <div className="text-2xl font-bold text-violet-800">
-              수련회가 마무리되었습니다.
+              성경학교가 마무리되었습니다.
             </div>
             <div className="text-lg text-violet-700 font-medium">
-              겨울 수련회에 다시 만나요!
+              겨울 성경학교에 다시 만나요!
             </div>
             <div className="text-sm text-violet-600">
               모든 프로그램이 완료되었습니다.
@@ -315,7 +315,7 @@ export default function CurrentProgramStatus() {
 
             <div className="space-y-2">
               <div className="text-lg font-bold text-orange-800">
-                수련회 접수 진행 중
+                성경학교 접수 진행 중
               </div>
               <div className="text-sm text-orange-700 font-medium">
                 7월 18일 15:00까지

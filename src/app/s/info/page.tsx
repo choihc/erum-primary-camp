@@ -27,7 +27,7 @@ export default function CampInfoPage() {
               <ArrowLeft className="h-4 w-4 mr-2" />
             </Button>
           </Link>
-          <h1 className="text-xl font-bold text-sky-800">수련회 정보</h1>
+          <h1 className="text-xl font-bold text-sky-800">성경학교 정보</h1>
           <div className="w-16"></div>
         </div>
       </div>
@@ -37,27 +37,27 @@ export default function CampInfoPage() {
         <div className="text-center space-y-2 py-6">
           <h2 className="text-2xl md:text-3xl font-bold text-sky-800 flex items-center justify-center">
             <Info className="h-8 w-8 mr-3" />
-            수련회에서 알아야할 점
+            성경학교에서 알아야할 점
           </h2>
           <p className="text-sky-600">
-            수련회 참가 전 꼭 알아두어야 할 중요한 정보들입니다
+            성경학교 참가 전 꼭 알아두어야 할 중요한 정보들입니다
           </p>
         </div>
 
         {/* 중요 안내사항 */}
         <div className="space-y-4">
-          {/* 수련회 시작 안내 */}
+          {/* 성경학교 시작 안내 */}
           <Card className="border-sky-200 bg-white/80 backdrop-blur-sm">
             <CardHeader>
               <CardTitle className="text-sky-800 flex items-center text-lg">
                 <Clock className="h-5 w-5 mr-2" />
-                수련회 시작 안내
+                성경학교 시작 안내
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-3 text-sm text-sky-700">
                 <p>
-                  • 수련회는{' '}
+                  • 성경학교는{' '}
                   <strong className="text-sky-800">
                     7월 18일(금) 오후 3시
                   </strong>{' '}
@@ -84,8 +84,8 @@ export default function CampInfoPage() {
             <CardContent>
               <div className="space-y-3 text-sm text-amber-800">
                 <p>
-                  • 은혜로운 수련회를 위하여{' '}
-                  <strong>핸드폰은 수련회 출발 전 수거</strong>합니다.
+                  • 은혜로운 성경학교를 위하여{' '}
+                  <strong>핸드폰은 성경학교 출발 전 수거</strong>합니다.
                 </p>
                 <div className="ml-4 space-y-1 text-amber-700">
                   <p>
@@ -126,18 +126,18 @@ export default function CampInfoPage() {
             </CardContent>
           </Card>
 
-          {/* 수련회 사진 안내 */}
+          {/* 성경학교 사진 안내 */}
           <Card className="border-purple-200 bg-purple-50/80 backdrop-blur-sm">
             <CardHeader>
               <CardTitle className="text-purple-800 flex items-center text-lg">
                 <Camera className="h-5 w-5 mr-2" />
-                수련회 사진 안내
+                성경학교 사진 안내
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-2 text-sm text-purple-800">
                 <p>
-                  • 수련회 사진은 <strong>교회 공식 SNS, 홈페이지</strong>에
+                  • 성경학교 사진은 <strong>교회 공식 SNS, 홈페이지</strong>에
                   업로드되며, <strong>네이버 MYBOX</strong>를 통하여 원본사진
                   다운로드가 가능합니다.
                 </p>
@@ -173,7 +173,7 @@ export default function CampInfoPage() {
               <div className="text-sm text-sky-800">
                 <p className="font-semibold mb-1">📢 중요 안내</p>
                 <p>
-                  위 내용을 반드시 숙지하시고 수련회에 참여해주시기 바랍니다.
+                  위 내용을 반드시 숙지하시고 성경학교에 참여해주시기 바랍니다.
                 </p>
                 <p className="mt-2 text-xs text-sky-600">
                   추가 문의사항은 담당 교사에게 연락해주세요.

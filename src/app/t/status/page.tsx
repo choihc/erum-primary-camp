@@ -115,7 +115,7 @@ export default function StatusPage() {
               <ArrowLeft className="h-4 w-4 mr-2" />
             </Button>
           </Link>
-          <h1 className="text-xl font-bold text-sky-800">조 현황</h1>
+          <h1 className="text-xl font-bold text-sky-800">점수 현황</h1>
           <div className="w-16"></div>
         </div>
       </div>
@@ -125,7 +125,7 @@ export default function StatusPage() {
         <div className="text-center space-y-2 py-6">
           <h2 className="text-2xl md:text-3xl font-bold text-sky-800 flex items-center justify-center">
             <BarChart3 className="h-8 w-8 mr-3" />
-            조별 점수 현황
+            점수 현황
           </h2>
           <p className="text-sky-600">
             각 조의 현재 점수를 확인하고 비교해보세요
@@ -198,9 +198,6 @@ export default function StatusPage() {
                       <h4 className="font-semibold text-sky-800">
                         {group.name}
                       </h4>
-                      <p className="text-sm text-sky-600">
-                        담당: {group.teacher}
-                      </p>
                     </div>
                   </div>
                   <div className="text-right">

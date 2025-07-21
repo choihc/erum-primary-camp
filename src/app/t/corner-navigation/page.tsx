@@ -49,6 +49,19 @@ interface GroupProgress {
   totalScore: number;
 }
 
+interface CornerScore {
+  id: number;
+  group_id: number;
+  corner_id: number;
+  score: number;
+  base_score: number;
+  bonus_score: number;
+  score_type: string;
+  result_detail?: string;
+  recorded_at: string;
+  updated_at: string;
+}
+
 export default function CornerNavigationPage() {
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   const [groupProgress, setGroupProgress] = useState<GroupProgress | null>(
@@ -61,6 +74,12 @@ export default function CornerNavigationPage() {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [finalScore, setFinalScore] = useState<number>(0);
   const [loading, setLoading] = useState(false);
+  const [cornerScores, setCornerScores] = useState<CornerScore[]>([]);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingCorner, setEditingCorner] = useState<{
+    cornerId: number;
+    currentScore: CornerScore | null;
+  } | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -102,17 +121,29 @@ export default function CornerNavigationPage() {
    * loadGroupProgress: 조별 진행 상황 로드
    * @param {number} groupId - 조 ID
    */
-  const loadGroupProgress = (groupId: number) => {
-    // 임시로 로컬 스토리지에서 진행 상황 로드
-    const storageKey = `group_${groupId}_progress`;
-    const savedProgress = localStorage.getItem(storageKey);
+  const loadGroupProgress = async (groupId: number) => {
+    try {
+      setLoading(true);
 
-    if (savedProgress) {
-      try {
-        const progress = JSON.parse(savedProgress) as GroupProgress;
+      // 진행 상황과 코너별 점수 기록을 동시에 로드
+      const [progressResponse, scoresResponse] = await Promise.all([
+        fetch(`/api/group-progress?groupId=${groupId}`),
+        fetch(`/api/corner-score?groupId=${groupId}`),
+      ]);
+
+      const progressResult = await progressResponse.json();
+      const scoresResult = await scoresResponse.json();
+
+      if (progressResult.success && progressResult.data) {
+        const progress: GroupProgress = {
+          groupId: progressResult.data.groupId,
+          currentCornerIndex: progressResult.data.currentCornerIndex,
+          completedCorners: progressResult.data.completedCorners,
+          totalScore: progressResult.data.totalScore,
+        };
         setGroupProgress(progress);
-      } catch {
-        // 초기 진행 상황 설정
+      } else {
+        // API 실패 시 초기 진행 상황 설정
         const initialProgress: GroupProgress = {
           groupId,
           currentCornerIndex: 0,
@@ -120,10 +151,17 @@ export default function CornerNavigationPage() {
           totalScore: 0,
         };
         setGroupProgress(initialProgress);
-        localStorage.setItem(storageKey, JSON.stringify(initialProgress));
       }
-    } else {
-      // 초기 진행 상황 설정
+
+      // 코너별 점수 기록 설정
+      if (scoresResult.success && scoresResult.data?.cornerScores) {
+        setCornerScores(scoresResult.data.cornerScores);
+      } else {
+        setCornerScores([]);
+      }
+    } catch (error) {
+      console.error('진행 상황 로드 오류:', error);
+      // 오류 시 초기 진행 상황 설정
       const initialProgress: GroupProgress = {
         groupId,
         currentCornerIndex: 0,
@@ -131,7 +169,9 @@ export default function CornerNavigationPage() {
         totalScore: 0,
       };
       setGroupProgress(initialProgress);
-      localStorage.setItem(storageKey, JSON.stringify(initialProgress));
+      setCornerScores([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -139,10 +179,35 @@ export default function CornerNavigationPage() {
    * saveGroupProgress: 조별 진행 상황 저장
    * @param {GroupProgress} progress - 저장할 진행 상황
    */
-  const saveGroupProgress = (progress: GroupProgress) => {
-    const storageKey = `group_${progress.groupId}_progress`;
-    localStorage.setItem(storageKey, JSON.stringify(progress));
-    setGroupProgress(progress);
+  const saveGroupProgress = async (progress: GroupProgress) => {
+    try {
+      const response = await fetch('/api/group-progress', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          groupId: progress.groupId,
+          currentCornerIndex: progress.currentCornerIndex,
+          completedCorners: progress.completedCorners,
+          totalScore: progress.totalScore,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setGroupProgress(progress);
+      } else {
+        console.error('진행 상황 저장 실패:', result.message);
+        // 저장 실패해도 로컬 상태는 업데이트
+        setGroupProgress(progress);
+      }
+    } catch (error) {
+      console.error('진행 상황 저장 오류:', error);
+      // 오류가 발생해도 로컬 상태는 업데이트
+      setGroupProgress(progress);
+    }
   };
 
   /**
@@ -221,6 +286,83 @@ export default function CornerNavigationPage() {
   };
 
   /**
+   * handleCornerEdit: 코너 편집 모달 열기
+   * @param {number} cornerId - 편집할 코너 ID
+   */
+  const handleCornerEdit = async (cornerId: number) => {
+    try {
+      if (!selectedGroupId) return;
+
+      // 해당 코너의 점수 기록 조회
+      const response = await fetch(
+        `/api/corner-score?groupId=${selectedGroupId}&cornerId=${cornerId}`
+      );
+      const result = await response.json();
+
+      setEditingCorner({
+        cornerId,
+        currentScore: result.success && result.data ? result.data : null,
+      });
+      setShowEditModal(true);
+    } catch (error) {
+      console.error('코너 점수 조회 오류:', error);
+      alert('코너 점수 정보를 불러올 수 없습니다.');
+    }
+  };
+
+  /**
+   * handleScoreEdit: 점수 수정 처리
+   * @param {number} newScore - 새로운 점수
+   * @param {number} baseScore - 기본 점수
+   * @param {number} bonusScore - 보너스 점수
+   * @param {string} scoreType - 점수 유형
+   */
+  const handleScoreEdit = async (
+    newScore: number,
+    baseScore: number,
+    bonusScore: number,
+    scoreType: string
+  ) => {
+    if (!editingCorner || !selectedGroupId) return;
+
+    try {
+      setLoading(true);
+
+      const response = await fetch('/api/corner-score', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          groupId: selectedGroupId,
+          cornerId: editingCorner.cornerId,
+          score: newScore,
+          baseScore,
+          bonusScore,
+          scoreType,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // 진행 상황 다시 로드
+        await loadGroupProgress(selectedGroupId);
+        setShowEditModal(false);
+        setEditingCorner(null);
+        alert('점수가 성공적으로 수정되었습니다.');
+      } else {
+        throw new Error(result.message || '점수 수정에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('점수 수정 오류:', error);
+      alert('점수 수정에 실패했습니다. 다시 시도해주세요.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
    * handleScoreConfirm: 점수 확인 및 등록
    */
   const handleScoreConfirm = async () => {
@@ -229,11 +371,11 @@ export default function CornerNavigationPage() {
     setLoading(true);
 
     try {
-      // 점수를 데이터베이스에 저장 (실제 API 호출)
       const sequence = getGroupSequence(selectedGroupId);
       const currentCornerId = sequence[groupProgress.currentCornerIndex];
 
-      const response = await fetch('/api/corner-score', {
+      // 1. 점수를 데이터베이스에 저장 (기존 API)
+      const scoreResponse = await fetch('/api/corner-score', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -241,6 +383,8 @@ export default function CornerNavigationPage() {
         body: JSON.stringify({
           groupId: selectedGroupId,
           score: finalScore,
+          baseScore: selectedScore,
+          bonusScore: bonusScore,
           cornerId: currentCornerId,
           scoreType:
             selectedScore === scoreSettings.win
@@ -253,21 +397,49 @@ export default function CornerNavigationPage() {
         }),
       });
 
-      const result = await response.json();
+      const scoreResult = await scoreResponse.json();
 
-      if (!result.success) {
-        throw new Error(result.message || '점수 저장에 실패했습니다.');
+      if (!scoreResult.success) {
+        throw new Error(scoreResult.message || '점수 저장에 실패했습니다.');
       }
 
-      // 진행 상황 업데이트
-      const updatedProgress: GroupProgress = {
-        ...groupProgress,
-        currentCornerIndex: groupProgress.currentCornerIndex + 1,
-        completedCorners: [...groupProgress.completedCorners, currentCornerId],
-        totalScore: groupProgress.totalScore + finalScore,
-      };
+      // 2. 코너 완료 처리 (새로운 API)
+      const progressResponse = await fetch('/api/group-progress', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          groupId: selectedGroupId,
+          cornerId: currentCornerId,
+          score: finalScore,
+        }),
+      });
 
-      saveGroupProgress(updatedProgress);
+      const progressResult = await progressResponse.json();
+
+      if (progressResult.success && progressResult.data) {
+        // API에서 반환된 데이터로 로컬 상태 업데이트
+        const updatedProgress: GroupProgress = {
+          groupId: progressResult.data.groupId,
+          currentCornerIndex: progressResult.data.currentCornerIndex,
+          completedCorners: progressResult.data.completedCorners,
+          totalScore: progressResult.data.totalScore,
+        };
+        setGroupProgress(updatedProgress);
+      } else {
+        // API 실패 시 로컬에서 업데이트
+        const updatedProgress: GroupProgress = {
+          ...groupProgress,
+          currentCornerIndex: groupProgress.currentCornerIndex + 1,
+          completedCorners: [
+            ...groupProgress.completedCorners,
+            currentCornerId,
+          ],
+          totalScore: groupProgress.totalScore + finalScore,
+        };
+        await saveGroupProgress(updatedProgress);
+      }
 
       // 모달 닫기
       setShowConfirmModal(false);
@@ -536,15 +708,25 @@ export default function CornerNavigationPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="flex items-center space-x-3">
-                  <MapPin className="h-5 w-5 text-sky-600" />
+              {/* 장소 정보를 더 강조해서 표시 */}
+              <div className="mb-4">
+                <div className="flex items-center space-x-3 p-4 bg-gradient-to-r from-blue-50 to-sky-50 rounded-lg border-2 border-sky-200">
+                  <div className="p-2 bg-sky-500 rounded-full">
+                    <MapPin className="h-6 w-6 text-white" />
+                  </div>
                   <div>
-                    <p className="font-medium text-sky-800">진행 장소</p>
-                    <p className="text-sky-700">{currentCorner.location}</p>
+                    <p className="text-sm font-medium text-sky-600 mb-1">
+                      진행 장소
+                    </p>
+                    <p className="text-xl font-bold text-sky-800">
+                      {currentCorner.location}
+                    </p>
                   </div>
                 </div>
-                <div className="flex items-center space-x-3">
+              </div>
+
+              <div className="grid md:grid-cols-1 gap-4">
+                <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
                   <Users className="h-5 w-5 text-sky-600" />
                   <div>
                     <p className="font-medium text-sky-800">담당 선생님</p>
@@ -555,14 +737,24 @@ export default function CornerNavigationPage() {
 
               {/* 다음 코너 정보 */}
               {nextCorner && (
-                <div className="bg-sky-50 rounded-lg p-4">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <ArrowRight className="h-4 w-4 text-sky-600" />
-                    <span className="font-medium text-sky-800">다음 코너</span>
+                <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-lg p-4 border border-emerald-200">
+                  <div className="flex items-center space-x-2 mb-3">
+                    <ArrowRight className="h-5 w-5 text-emerald-600" />
+                    <span className="font-medium text-emerald-800">
+                      다음 코너
+                    </span>
                   </div>
-                  <p className="text-sky-700">
-                    {nextCorner.name} - {nextCorner.location}
-                  </p>
+                  <div className="space-y-2">
+                    <p className="font-semibold text-emerald-800">
+                      {nextCorner.name}
+                    </p>
+                    <div className="flex items-center space-x-2">
+                      <MapPin className="h-4 w-4 text-emerald-600" />
+                      <span className="font-medium text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full text-sm">
+                        {nextCorner.location}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               )}
             </CardContent>
@@ -722,7 +914,8 @@ export default function CornerNavigationPage() {
           <DialogHeader>
             <DialogTitle>{selectedGroupId}조 코너 순서</DialogTitle>
             <DialogDescription>
-              전체 코너 활동 순서를 확인할 수 있습니다.
+              전체 코너 활동 순서를 확인할 수 있습니다. 완료된 코너를 클릭하면
+              점수를 수정할 수 있습니다.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 max-h-96 overflow-y-auto">
@@ -732,6 +925,38 @@ export default function CornerNavigationPage() {
                 groupProgress?.completedCorners.includes(cornerId);
               const isCurrent = groupProgress?.currentCornerIndex === index;
 
+              // 해당 코너의 점수 기록 찾기
+              const cornerScore = cornerScores.find(
+                (score) => score.corner_id === cornerId
+              );
+
+              // 점수 유형에 따른 결과 텍스트
+              const getResultText = (scoreType: string) => {
+                switch (scoreType) {
+                  case 'win':
+                    return '승리';
+                  case 'lose':
+                    return '패배';
+                  case 'draw':
+                    return '무승부';
+                  default:
+                    return '기타';
+                }
+              };
+
+              const getResultColor = (scoreType: string) => {
+                switch (scoreType) {
+                  case 'win':
+                    return 'text-green-600 bg-green-100';
+                  case 'lose':
+                    return 'text-red-600 bg-red-100';
+                  case 'draw':
+                    return 'text-yellow-600 bg-yellow-100';
+                  default:
+                    return 'text-gray-600 bg-gray-100';
+                }
+              };
+
               return (
                 <div
                   key={cornerId}
@@ -739,9 +964,10 @@ export default function CornerNavigationPage() {
                     isCurrent
                       ? 'border-sky-500 bg-sky-50'
                       : isCompleted
-                      ? 'border-green-500 bg-green-50'
+                      ? 'border-green-500 bg-green-50 cursor-pointer hover:bg-green-100'
                       : 'border-gray-200 bg-gray-50'
                   }`}
+                  onClick={() => isCompleted && handleCornerEdit(cornerId)}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
@@ -764,24 +990,54 @@ export default function CornerNavigationPage() {
                           </span>
                         )}
                       </div>
-                      <div>
-                        <p className="font-medium">{corner?.name}</p>
-                        <p className="text-sm text-gray-600">
-                          {corner?.location}
-                        </p>
+                      <div className="flex-1">
+                        <p className="font-medium text-lg">{corner?.name}</p>
+                        <div className="flex items-center space-x-2 mt-1 mb-2">
+                          <MapPin className="h-4 w-4 text-blue-500" />
+                          <span className="text-sm font-medium text-blue-700 bg-blue-100 px-2 py-1 rounded-md">
+                            {corner?.location}
+                          </span>
+                        </div>
+                        {/* 점수 및 결과 표시 */}
+                        {cornerScore && (
+                          <div className="flex items-center space-x-2 mt-2">
+                            <span className="text-sm font-semibold text-blue-600">
+                              {cornerScore.score}점
+                            </span>
+                            {cornerScore.bonus_score > 0 && (
+                              <span className="text-xs text-green-600">
+                                (+{cornerScore.bonus_score} 보너스)
+                              </span>
+                            )}
+                            <span
+                              className={`text-xs px-2 py-1 rounded-full ${getResultColor(
+                                cornerScore.score_type
+                              )}`}
+                            >
+                              {getResultText(cornerScore.score_type)}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
-                    <Badge
-                      variant={
-                        isCurrent
-                          ? 'default'
-                          : isCompleted
-                          ? 'secondary'
-                          : 'outline'
-                      }
-                    >
-                      {isCurrent ? '진행중' : isCompleted ? '완료' : '대기'}
-                    </Badge>
+                    <div className="flex flex-col items-end space-y-1">
+                      <Badge
+                        variant={
+                          isCurrent
+                            ? 'default'
+                            : isCompleted
+                            ? 'secondary'
+                            : 'outline'
+                        }
+                      >
+                        {isCurrent ? '진행중' : isCompleted ? '완료' : '대기'}
+                      </Badge>
+                      {isCompleted && (
+                        <span className="text-xs text-gray-500">
+                          클릭하여 수정
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -789,6 +1045,223 @@ export default function CornerNavigationPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* 점수 수정 모달 */}
+      <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>점수 수정</DialogTitle>
+            <DialogDescription>
+              {editingCorner && getCornerById(editingCorner.cornerId)?.name}{' '}
+              코너의 점수를 수정합니다.
+            </DialogDescription>
+          </DialogHeader>
+          {editingCorner && (
+            <ScoreEditForm
+              currentScore={editingCorner.currentScore}
+              onSubmit={handleScoreEdit}
+              onCancel={() => {
+                setShowEditModal(false);
+                setEditingCorner(null);
+              }}
+              loading={loading}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
+/**
+ * ScoreEditForm: 점수 수정 폼 컴포넌트
+ */
+interface ScoreEditFormProps {
+  currentScore: CornerScore | null;
+  onSubmit: (
+    score: number,
+    baseScore: number,
+    bonusScore: number,
+    scoreType: string
+  ) => void;
+  onCancel: () => void;
+  loading: boolean;
+}
+
+const ScoreEditForm = ({
+  currentScore,
+  onSubmit,
+  onCancel,
+  loading,
+}: ScoreEditFormProps) => {
+  const [selectedScore, setSelectedScore] = useState<number>(
+    currentScore?.base_score || 0
+  );
+  const [bonusScore, setBonusScore] = useState<number>(
+    currentScore?.bonus_score || 0
+  );
+  const [scoreType, setScoreType] = useState<string>(
+    currentScore?.score_type || 'manual'
+  );
+
+  /**
+   * handleBonusChange: 보너스 점수 변경
+   * @param {number} change - 변경할 보너스 점수
+   */
+  const handleBonusChange = (change: number) => {
+    const newBonus = Math.max(
+      0,
+      Math.min(scoreSettings.bonusMax, bonusScore + change)
+    );
+    setBonusScore(newBonus);
+  };
+
+  /**
+   * handleSubmit: 점수 수정 제출
+   */
+  const handleSubmit = () => {
+    const totalScore = selectedScore + bonusScore;
+    onSubmit(totalScore, selectedScore, bonusScore, scoreType);
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* 현재 정보 표시 */}
+      <div className="bg-gray-50 p-3 rounded-lg">
+        <h4 className="font-medium text-gray-800 mb-2">현재 점수 정보</h4>
+        {currentScore ? (
+          <div className="text-sm text-gray-600 space-y-1">
+            <p>총 점수: {currentScore.score}점</p>
+            <p>기본 점수: {currentScore.base_score}점</p>
+            <p>보너스 점수: {currentScore.bonus_score}점</p>
+            <p>
+              결과:{' '}
+              {currentScore.score_type === 'win'
+                ? '승리'
+                : currentScore.score_type === 'lose'
+                ? '패배'
+                : currentScore.score_type === 'draw'
+                ? '무승부'
+                : '기타'}
+            </p>
+          </div>
+        ) : (
+          <p className="text-sm text-gray-600">점수 기록이 없습니다.</p>
+        )}
+      </div>
+
+      {/* 점수 선택 */}
+      <div>
+        <h4 className="font-medium text-gray-800 mb-3">새로운 점수 선택</h4>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <Button
+            variant={scoreType === 'win' ? 'default' : 'outline'}
+            onClick={() => {
+              setSelectedScore(scoreSettings.win);
+              setScoreType('win');
+            }}
+            className={`h-16 ${
+              scoreType === 'win'
+                ? 'bg-green-500 hover:bg-green-600'
+                : 'hover:bg-green-50'
+            }`}
+          >
+            <div className="text-center">
+              <Trophy className="h-4 w-4 mx-auto mb-1" />
+              <div className="font-semibold">승리</div>
+              <div className="text-sm">{scoreSettings.win}점</div>
+            </div>
+          </Button>
+          <Button
+            variant={scoreType === 'draw' ? 'default' : 'outline'}
+            onClick={() => {
+              setSelectedScore(scoreSettings.draw);
+              setScoreType('draw');
+            }}
+            className={`h-16 ${
+              scoreType === 'draw'
+                ? 'bg-yellow-500 hover:bg-yellow-600'
+                : 'hover:bg-yellow-50'
+            }`}
+          >
+            <div className="text-center">
+              <CheckCircle className="h-4 w-4 mx-auto mb-1" />
+              <div className="font-semibold">동점</div>
+              <div className="text-sm">{scoreSettings.draw}점</div>
+            </div>
+          </Button>
+          <Button
+            variant={scoreType === 'lose' ? 'default' : 'outline'}
+            onClick={() => {
+              setSelectedScore(scoreSettings.lose);
+              setScoreType('lose');
+            }}
+            className={`h-16 ${
+              scoreType === 'lose'
+                ? 'bg-red-500 hover:bg-red-600'
+                : 'hover:bg-red-50'
+            }`}
+          >
+            <div className="text-center">
+              <AlertCircle className="h-4 w-4 mx-auto mb-1" />
+              <div className="font-semibold">패배</div>
+              <div className="text-sm">{scoreSettings.lose}점</div>
+            </div>
+          </Button>
+        </div>
+      </div>
+
+      {/* 보너스 점수 */}
+      <div>
+        <h4 className="font-medium text-gray-800 mb-3">보너스 점수</h4>
+        <div className="flex items-center justify-center space-x-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleBonusChange(-1)}
+            disabled={bonusScore <= 0}
+          >
+            <Minus className="h-4 w-4" />
+          </Button>
+          <span className="text-lg font-semibold min-w-[60px] text-center">
+            +{bonusScore}점
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleBonusChange(1)}
+            disabled={bonusScore >= scoreSettings.bonusMax}
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
+      {/* 총 점수 표시 */}
+      <div className="text-center">
+        <div className="text-xl font-bold text-green-600">
+          총 점수: {selectedScore + bonusScore}점
+        </div>
+      </div>
+
+      {/* 버튼들 */}
+      <div className="flex space-x-2">
+        <Button
+          variant="outline"
+          className="flex-1"
+          onClick={onCancel}
+          disabled={loading}
+        >
+          취소
+        </Button>
+        <Button
+          className="flex-1 bg-sky-600 hover:bg-sky-700"
+          onClick={handleSubmit}
+          disabled={loading}
+        >
+          {loading ? '수정 중...' : '점수 수정'}
+        </Button>
+      </div>
+    </div>
+  );
+};

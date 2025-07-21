@@ -24,8 +24,6 @@ export interface Group {
   id: number;
   group_number: number;
   name: string;
-  teacher: string;
-  leader: string;
   score: number;
   created_at: string;
 }
@@ -33,7 +31,6 @@ export interface Group {
 export interface GroupMember {
   id: number;
   name: string;
-  role: 'student' | 'teacher';
   contact: string;
   group_id: number;
   class?: string;
@@ -47,8 +44,6 @@ export interface Student {
   group_id: number;
   group_name: string;
   contact: string;
-  role: 'student' | 'teacher';
-  is_leader: boolean;
   created_at: string;
 }
 

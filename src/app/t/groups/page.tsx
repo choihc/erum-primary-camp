@@ -20,16 +20,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  ArrowLeft,
-  Users,
-  GraduationCap,
-  Crown,
-  RefreshCw,
-  AlertCircle,
-} from 'lucide-react';
+import { ArrowLeft, Users, RefreshCw, AlertCircle } from 'lucide-react';
 import { supabase, Group, GroupMember } from '@/lib/supabase';
-import { PhoneLink } from '@/components/ui/phone-link';
 
 interface GroupWithMembers extends Group {
   members: GroupMember[];
@@ -106,8 +98,7 @@ export default function TeacherGroupsPage() {
           .from('group_members')
           .select('*')
           .eq('group_id', group.group_number)
-          .order('role', { ascending: false }) // 교사 먼저 (teacher > student)
-          .order('name', { ascending: true }); // 그 다음 이름순
+          .order('name', { ascending: true });
 
         if (membersError) {
           console.error(
@@ -131,34 +122,6 @@ export default function TeacherGroupsPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const getRoleBadge = (role: 'student' | 'teacher') => {
-    if (role === 'teacher') {
-      return (
-        <Badge variant="secondary" className="bg-blue-100 text-blue-700 ml-2">
-          <GraduationCap className="h-3 w-3 mr-1" />
-          교사
-        </Badge>
-      );
-    }
-    return (
-      <Badge variant="outline" className="border-sky-300 text-sky-700 ml-2">
-        학생
-      </Badge>
-    );
-  };
-
-  const getLeaderBadge = (memberName: string, leaderName: string) => {
-    if (memberName === leaderName) {
-      return (
-        <Badge variant="secondary" className="bg-amber-100 text-amber-700 ml-2">
-          <Crown className="h-3 w-3 mr-1" />
-          조장
-        </Badge>
-      );
-    }
-    return null;
   };
 
   if (loading) {
@@ -239,7 +202,7 @@ export default function TeacherGroupsPage() {
             >
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-sky-800">{group.name}</CardTitle>{' '}
+                  <CardTitle className="text-sky-800">{group.name}</CardTitle>
                   <Badge
                     variant="outline"
                     className="border-sky-300 text-sky-700"
@@ -247,9 +210,6 @@ export default function TeacherGroupsPage() {
                     {group.members.length}명
                   </Badge>
                 </div>
-                <CardDescription className="text-sky-600">
-                  담당교사: {group.teacher} | 조장: {group.leader}
-                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center justify-between text-sm">
@@ -274,8 +234,7 @@ export default function TeacherGroupsPage() {
                     {selectedGroup.name} 상세 정보
                   </DialogTitle>
                   <DialogDescription className="text-sky-600">
-                    담당교사: {selectedGroup.teacher} | 조장:{' '}
-                    {selectedGroup.leader} | 현재 점수: {selectedGroup.score}점
+                    현재 점수: {selectedGroup.score}점
                   </DialogDescription>
                 </DialogHeader>
 
@@ -310,11 +269,6 @@ export default function TeacherGroupsPage() {
                                 <span className="font-medium text-sky-800">
                                   {member.name}
                                 </span>
-                                {getRoleBadge(member.role)}
-                                {getLeaderBadge(
-                                  member.name,
-                                  selectedGroup.leader
-                                )}
                               </div>
                               {member.class && (
                                 <span className="text-sm text-sky-600">
@@ -323,16 +277,6 @@ export default function TeacherGroupsPage() {
                               )}
                             </div>
                           </div>
-
-                          {member.contact && (
-                            <div className="flex items-center text-sm text-sky-600">
-                              <PhoneLink
-                                phoneNumber={member.contact}
-                                showIcon
-                                className="text-sky-600 text-sm"
-                              />
-                            </div>
-                          )}
                         </div>
                       ))}
                     </div>
@@ -353,8 +297,6 @@ export default function TeacherGroupsPage() {
                   • 조 카드를 클릭하면 모달창에서 상세 구성원 정보를 확인할 수
                   있습니다
                 </li>
-                <li>• 교사와 조장은 별도 배지로 표시됩니다</li>
-                <li>• 연락처가 등록된 구성원의 경우 전화번호가 표시됩니다</li>
                 <li>• 새로고침 버튼으로 최신 정보를 불러올 수 있습니다</li>
                 <li>• 모달창은 ESC 키나 바깥 영역 클릭으로 닫을 수 있습니다</li>
               </ul>

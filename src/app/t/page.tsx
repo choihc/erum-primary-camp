@@ -189,7 +189,7 @@ export default function TeacherAuthPage() {
               <div className="text-sm text-emerald-700">
                 <p className="font-semibold mb-1">세션 정보</p>
                 <ul className="space-y-1 text-xs">
-                  <li>• 인증 후 24시간 동안 로그인 상태가 유지됩니다</li>
+                  <li>• 인증 후 7일 동안 로그인 상태가 유지됩니다</li>
                   <li>• 세션 만료 시 다시 인증해야 합니다</li>
                   <li>• 브라우저를 닫으면 세션이 종료됩니다</li>
                 </ul>

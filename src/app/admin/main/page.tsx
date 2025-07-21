@@ -12,32 +12,32 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   ArrowLeft,
   Users,
-  UserPlus,
-  Shield,
-  LogOut,
-  Database,
+  RefreshCw,
+  AlertCircle,
+  Edit,
   Bell,
 } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 interface Group {
   id: number;
-  name: string;
-  teacher: string;
-  leader: string;
-  score: number;
   group_number: number;
+  name: string;
+  score: number;
+  created_at: string;
 }
 
 interface GroupMember {
   id: number;
   name: string;
-  role: 'teacher' | 'student';
-  contact?: string;
+  contact: string;
   group_id: number;
   class?: string;
+  created_at: string;
 }
 
 export default function AdminMainPage() {
@@ -48,11 +48,11 @@ export default function AdminMainPage() {
   const router = useRouter();
 
   useEffect(() => {
-    checkAuthentication();
-    loadData();
+    checkAuthAndLoadData();
   }, []);
 
-  const checkAuthentication = () => {
+  const checkAuthAndLoadData = () => {
+    // 관리자 인증 확인
     const sessionData = localStorage.getItem('adminSession');
     if (!sessionData) {
       router.push('/admin');
@@ -68,74 +68,78 @@ export default function AdminMainPage() {
         router.push('/admin');
         return;
       }
+
+      loadDashboardData();
     } catch {
       localStorage.removeItem('adminSession');
       router.push('/admin');
     }
   };
 
-  const loadData = async () => {
+  const loadDashboardData = async () => {
+    setLoading(true);
+    setError('');
+
     try {
-      setLoading(true);
+      // 조 정보 로드
+      const { data: groupsData, error: groupsError } = await supabase
+        .from('groups')
+        .select('*')
+        .order('group_number');
 
-      // 그룹 데이터 로드
-      const groupsResponse = await fetch('/api/groups');
-      if (groupsResponse.ok) {
-        const groupsData = await groupsResponse.json();
-
-        // 조 이름의 숫자 기준으로 정렬 (1조, 2조, 3조... 순서)
-        const sortedGroups = groupsData.sort((a: Group, b: Group) => {
-          const getNumber = (name: string) => {
-            const match = name.match(/(\d+)/);
-            return match ? parseInt(match[1]) : 0;
-          };
-          return getNumber(a.name) - getNumber(b.name);
-        });
-
-        setGroups(sortedGroups);
+      if (groupsError) {
+        throw groupsError;
       }
 
-      // 그룹 멤버 데이터 로드
-      const membersResponse = await fetch('/api/group-members');
-      if (membersResponse.ok) {
-        const membersData = await membersResponse.json();
-        setGroupMembers(membersData);
+      // 조원 정보 로드
+      const { data: membersData, error: membersError } = await supabase
+        .from('group_members')
+        .select('*')
+        .order('name');
+
+      if (membersError) {
+        throw membersError;
       }
+
+      setGroups(groupsData || []);
+      setGroupMembers(membersData || []);
     } catch (error) {
-      console.error('데이터 로드 오류:', error);
+      console.error('Error loading dashboard data:', error);
       setError('데이터를 불러오는 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('adminSession');
-    router.push('/admin');
-  };
-
-  const getGroupMembers = (groupId: number) => {
-    return groupMembers.filter((member) => member.group_id === groupId);
-  };
-
-  const getTeacherCount = (groupId: number) => {
-    return getGroupMembers(groupId).filter(
-      (member) => member.role === 'teacher'
-    ).length;
-  };
-
   const getStudentCount = (groupId: number) => {
-    return getGroupMembers(groupId).filter(
-      (member) => member.role === 'student'
-    ).length;
+    return groupMembers.filter((member) => member.group_id === groupId).length;
   };
+
+  const menuItems = [
+    {
+      title: '조 관리',
+      description: '조 생성, 수정, 삭제 및 멤버 관리',
+      icon: Users,
+      href: '/admin/groups',
+      color: 'bg-blue-500 hover:bg-blue-600',
+    },
+    {
+      title: '공지사항 관리',
+      description: '공지사항 작성, 수정, 삭제',
+      icon: Bell,
+      href: '/admin/notices',
+      color: 'bg-green-500 hover:bg-green-600',
+    },
+  ];
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
-          <p className="text-purple-600">데이터를 불러오는 중...</p>
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100">
+        <div className="max-w-6xl mx-auto p-4">
+          <div className="text-center py-12">
+            <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-purple-600" />
+            <p className="text-purple-700">관리자 대시보드를 불러오는 중...</p>
+          </div>
         </div>
       </div>
     );
@@ -143,211 +147,182 @@ export default function AdminMainPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100">
-      <div className="container mx-auto px-4 py-8">
-        {/* 헤더 */}
-        <div className="flex justify-between items-center mb-8">
-          <div className="flex items-center space-x-4">
-            <Link href="/">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-purple-600 hover:text-purple-700"
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-              </Button>
-            </Link>
-            <div className="flex items-center space-x-2">
-              <Shield className="h-8 w-8 text-purple-600" />
-              <h1 className="text-3xl font-bold text-purple-800">
-                관리자 대시보드
-              </h1>
-            </div>
-          </div>
+      {/* Header */}
+      <div className="bg-white/80 backdrop-blur-sm border-b border-purple-200">
+        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+          <Link href="/admin">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-purple-600 hover:text-purple-700"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+            </Button>
+          </Link>
+          <h1 className="text-xl font-bold text-purple-800">관리자 대시보드</h1>
           <Button
-            onClick={handleLogout}
-            variant="outline"
-            className="text-purple-600 border-purple-300 hover:bg-purple-100"
+            variant="ghost"
+            size="sm"
+            onClick={loadDashboardData}
+            disabled={loading}
+            className="text-purple-600 hover:text-purple-700"
           >
-            <LogOut className="h-4 w-4 mr-2" />
-            로그아웃
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           </Button>
         </div>
+      </div>
 
+      <div className="max-w-6xl mx-auto p-4 space-y-6">
         {/* 에러 메시지 */}
         {error && (
-          <Card className="mb-6 border-red-200 bg-red-50">
-            <CardContent className="p-4">
-              <p className="text-red-700">{error}</p>
-            </CardContent>
-          </Card>
+          <Alert className="border-red-200 bg-red-50">
+            <AlertCircle className="h-4 w-4 text-red-600" />
+            <AlertDescription className="text-red-700">
+              {error}
+            </AlertDescription>
+          </Alert>
         )}
 
-        {/* 통계 카드 */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card className="border-blue-200 bg-blue-50/80">
-            <CardContent className="p-6">
-              <div className="flex items-center space-x-3">
-                <Users className="h-8 w-8 text-blue-600" />
-                <div>
-                  <p className="text-2xl font-bold text-blue-800">
-                    {groups.length}
-                  </p>
-                  <p className="text-blue-600 text-sm">전체 조</p>
-                </div>
+        {/* 페이지 제목 */}
+        <div className="text-center space-y-2 py-6">
+          <h2 className="text-2xl md:text-3xl font-bold text-purple-800">
+            관리자 대시보드
+          </h2>
+          <p className="text-purple-600">
+            여름성경학교 전체 현황을 관리하고 모니터링하세요
+          </p>
+        </div>
+
+        {/* 전체 통계 */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Card className="border-purple-200 bg-white/80 backdrop-blur-sm">
+            <CardHeader className="text-center">
+              <CardTitle className="text-purple-800">전체 조</CardTitle>
+            </CardHeader>
+            <CardContent className="text-center">
+              <div className="text-3xl font-bold text-purple-700">
+                {groups.length}
               </div>
+              <p className="text-sm text-purple-600">개</p>
             </CardContent>
           </Card>
 
-          <Card className="border-green-200 bg-green-50/80">
-            <CardContent className="p-6">
-              <div className="flex items-center space-x-3">
-                <UserPlus className="h-8 w-8 text-green-600" />
-                <div>
-                  <p className="text-2xl font-bold text-green-800">
-                    {groupMembers.filter((m) => m.role === 'teacher').length}
-                  </p>
-                  <p className="text-green-600 text-sm">전체 교사</p>
-                </div>
+          <Card className="border-purple-200 bg-white/80 backdrop-blur-sm">
+            <CardHeader className="text-center">
+              <CardTitle className="text-purple-800">전체 학생</CardTitle>
+            </CardHeader>
+            <CardContent className="text-center">
+              <div className="text-3xl font-bold text-purple-700">
+                {groupMembers.length}
               </div>
+              <p className="text-sm text-purple-600">명</p>
             </CardContent>
           </Card>
 
-          <Card className="border-orange-200 bg-orange-50/80">
-            <CardContent className="p-6">
-              <div className="flex items-center space-x-3">
-                <Users className="h-8 w-8 text-orange-600" />
-                <div>
-                  <p className="text-2xl font-bold text-orange-800">
-                    {groupMembers.filter((m) => m.role === 'student').length}
-                  </p>
-                  <p className="text-orange-600 text-sm">전체 학생</p>
-                </div>
+          <Card className="border-purple-200 bg-white/80 backdrop-blur-sm">
+            <CardHeader className="text-center">
+              <CardTitle className="text-purple-800">평균 조원 수</CardTitle>
+            </CardHeader>
+            <CardContent className="text-center">
+              <div className="text-3xl font-bold text-purple-700">
+                {groups.length > 0
+                  ? (groupMembers.length / groups.length).toFixed(1)
+                  : '0'}
               </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-purple-200 bg-purple-50/80">
-            <CardContent className="p-6">
-              <div className="flex items-center space-x-3">
-                <Database className="h-8 w-8 text-purple-600" />
-                <div>
-                  <p className="text-2xl font-bold text-purple-800">
-                    {groupMembers.length}
-                  </p>
-                  <p className="text-purple-600 text-sm">전체 인원</p>
-                </div>
-              </div>
+              <p className="text-sm text-purple-600">명</p>
             </CardContent>
           </Card>
         </div>
 
         {/* 관리 메뉴 */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Link href="/admin/notices">
-            <Card className="border-orange-200 bg-white/80 hover:bg-white/90 transition-colors cursor-pointer">
-              <CardHeader>
-                <CardTitle className="text-orange-800 flex items-center">
-                  <Bell className="h-5 w-5 mr-2" />
-                  공지사항 등록
-                </CardTitle>
-                <CardDescription>
-                  교사들에게 전달할 공지사항을 작성하고 관리합니다
-                </CardDescription>
-              </CardHeader>
-            </Card>
-          </Link>
-
-          <Link href="/admin/groups">
-            <Card className="border-purple-200 bg-white/80 hover:bg-white/90 transition-colors cursor-pointer">
-              <CardHeader>
-                <CardTitle className="text-purple-800 flex items-center">
-                  <Users className="h-5 w-5 mr-2" />조 관리
-                </CardTitle>
-                <CardDescription>
-                  조별 교사와 학생을 추가, 수정, 삭제할 수 있습니다
-                </CardDescription>
-              </CardHeader>
-            </Card>
-          </Link>
-
-          <Card
-            className="border-blue-200 bg-white/80 hover:bg-white/90 transition-colors cursor-pointer"
-            onClick={async () => {
-              try {
-                const response = await fetch('/api/test-connection');
-                const result = await response.json();
-                if (result.success) {
-                  alert(
-                    '✅ 데이터베이스 연결 성공!\n' +
-                      JSON.stringify(result.data, null, 2)
-                  );
-                } else {
-                  alert('❌ 데이터베이스 연결 실패:\n' + result.error);
-                }
-              } catch (error) {
-                alert('❌ 연결 테스트 실패:\n' + error);
-              }
-            }}
-          >
-            <CardHeader>
-              <CardTitle className="text-blue-800 flex items-center">
-                <Database className="h-5 w-5 mr-2" />
-                연결 테스트
-              </CardTitle>
-              <CardDescription>
-                데이터베이스 연결 상태를 확인합니다
-              </CardDescription>
-            </CardHeader>
-          </Card>
-        </div>
-
-        {/* 조별 현황 */}
-        <Card className="border-gray-200 bg-white/80">
+        <Card className="border-purple-200 bg-white/80 backdrop-blur-sm">
           <CardHeader>
-            <CardTitle className="text-gray-800">조별 현황</CardTitle>
-            <CardDescription>
-              각 조의 교사 및 학생 현황을 확인할 수 있습니다
+            <CardTitle className="text-purple-800 flex items-center">
+              <Edit className="h-5 w-5 mr-2" />
+              관리 기능
+            </CardTitle>
+            <CardDescription className="text-purple-600">
+              아래 메뉴를 선택하여 각 기능을 관리하세요
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {groups
-                .filter((group) => group.group_number <= 20)
-                .map((group) => {
-                  return (
-                    <Card key={group.id} className="border-gray-100">
-                      <CardHeader className="pb-3">
-                        <div className="flex justify-between items-start">
-                          <CardTitle className="text-lg text-gray-800">
-                            {group.name}
+            <div className="grid md:grid-cols-2 gap-4">
+              {menuItems.map((item, index) => (
+                <Link key={index} href={item.href}>
+                  <Card className="cursor-pointer transition-all hover:shadow-lg hover:scale-105 border-purple-100">
+                    <CardHeader>
+                      <div className="flex items-center space-x-3">
+                        <div className={`p-3 rounded-lg ${item.color}`}>
+                          <item.icon className="h-6 w-6 text-white" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-purple-800">
+                            {item.title}
                           </CardTitle>
-                          <Badge
-                            variant="outline"
-                            className="text-blue-600 border-blue-300"
-                          >
-                            {group.score}점
-                          </Badge>
+                          <CardDescription className="text-purple-600 text-sm">
+                            {item.description}
+                          </CardDescription>
                         </div>
-                      </CardHeader>
-                      <CardContent className="pt-0">
-                        <div className="space-y-2 text-sm">
-                          <p className="text-gray-600">
-                            <span className="font-medium">조장:</span>{' '}
-                            {group.leader}
-                          </p>
-                          <div className="flex justify-between">
-                            <span className="text-green-600">
-                              교사: {getTeacherCount(group.group_number)}명
-                            </span>
-                            <span className="text-blue-600">
-                              학생: {getStudentCount(group.group_number)}명
-                            </span>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
+                      </div>
+                    </CardHeader>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 조별 현황 요약 */}
+        <Card className="border-purple-200 bg-white/80 backdrop-blur-sm">
+          <CardHeader>
+            <CardTitle className="text-purple-800 flex items-center">
+              <Users className="h-5 w-5 mr-2" />
+              조별 현황 요약
+            </CardTitle>
+            <CardDescription className="text-purple-600">
+              각 조의 기본 정보를 확인하세요
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {groups.map((group) => (
+                <div
+                  key={group.id}
+                  className="p-4 border border-purple-200 rounded-lg bg-purple-50/50"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-semibold text-purple-800">
+                      {group.name}
+                    </h4>
+                    <Badge variant="outline" className="border-purple-300">
+                      {getStudentCount(group.group_number)}명
+                    </Badge>
+                  </div>
+                  <div className="text-sm text-purple-600 space-y-1">
+                    <div>점수: {group.score}점</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 시스템 정보 */}
+        <Card className="border-emerald-200 bg-emerald-50/80 backdrop-blur-sm">
+          <CardContent className="p-4">
+            <div className="text-sm text-emerald-700 space-y-2">
+              <p className="font-semibold">💡 관리자 기능 안내</p>
+              <ul className="space-y-1 text-xs">
+                <li>
+                  • 조 관리에서 새로운 조를 생성하고 멤버를 추가/삭제할 수
+                  있습니다
+                </li>
+                <li>
+                  • 공지사항 관리에서 모든 사용자에게 표시될 공지를 작성할 수
+                  있습니다
+                </li>
+                <li>• 새로고침 버튼으로 최신 데이터를 불러올 수 있습니다</li>
+              </ul>
             </div>
           </CardContent>
         </Card>

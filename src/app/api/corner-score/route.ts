@@ -10,7 +10,8 @@ import { supabase } from '@/lib/supabase';
 
 export async function POST(request: NextRequest) {
   try {
-    const { groupId, score, cornerId, scoreType } = await request.json();
+    const { groupId, score, cornerId, scoreType, baseScore, bonusScore } =
+      await request.json();
 
     // 필수 파라미터 검증
     if (!groupId || score === undefined || !cornerId) {
@@ -49,24 +50,43 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 코너 점수 기록 저장 (선택사항 - 테이블이 있을 경우)
-    // TODO: corner_scores 테이블 생성 후 활성화
-    console.log(`Score type: ${scoreType || 'manual'} for corner ${cornerId}`);
-    /*
-    const { error: recordError } = await supabase
-      .from('corner_scores')
-      .insert({
+    // 코너 점수 기록 저장
+    const { error: recordError } = await supabase.from('corner_scores').upsert(
+      {
         group_id: group.id,
         corner_id: cornerId,
         score: score,
-        score_type: scoreType || 'manual'
-      });
+        base_score: baseScore || score,
+        bonus_score: bonusScore || 0,
+        score_type: scoreType || 'manual',
+      },
+      {
+        onConflict: 'group_id,corner_id',
+      }
+    );
 
     if (recordError) {
       console.error('코너 점수 기록 오류:', recordError);
       // 기록 실패해도 점수 업데이트는 성공으로 처리
     }
-    */
+
+    // group_progress 테이블의 total_score도 업데이트
+    const { error: progressUpdateError } = await supabase
+      .from('group_progress')
+      .upsert(
+        {
+          group_id: group.id,
+          total_score: newScore, // groups 테이블의 새 점수와 동기화
+        },
+        {
+          onConflict: 'group_id',
+        }
+      );
+
+    if (progressUpdateError) {
+      console.error('진행 상황 점수 업데이트 오류:', progressUpdateError);
+      // 오류 발생해도 메인 점수 업데이트는 성공으로 처리
+    }
 
     return NextResponse.json(
       {
@@ -78,6 +98,7 @@ export async function POST(request: NextRequest) {
           addedScore: score,
           newScore: newScore,
           cornerId: cornerId,
+          scoreType: scoreType,
         },
       },
       { status: 200 }
@@ -92,12 +113,13 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * 코너 진행 상황 조회 API
+ * 코너별 상세 점수 기록 조회 API
  */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const groupId = searchParams.get('groupId');
+    const cornerId = searchParams.get('cornerId');
 
     if (!groupId) {
       return NextResponse.json(
@@ -120,21 +142,176 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 코너 진행 상황 조회 (임시로 로컬 스토리지 사용)
-    // TODO: 실제 데이터베이스에서 조회하도록 변경
-    return NextResponse.json(
-      {
+    if (cornerId) {
+      // 특정 코너의 점수 기록 조회
+      const { data: cornerScore, error: cornerError } = await supabase
+        .from('corner_scores')
+        .select('*')
+        .eq('group_id', group.id)
+        .eq('corner_id', parseInt(cornerId))
+        .single();
+
+      if (cornerError && cornerError.code !== 'PGRST116') {
+        console.error('코너 점수 조회 오류:', cornerError);
+        return NextResponse.json(
+          { success: false, message: '코너 점수 조회에 실패했습니다.' },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        data: cornerScore || null,
+      });
+    } else {
+      // 해당 조의 모든 코너 점수 기록 조회
+      const { data: cornerScores, error: scoresError } = await supabase
+        .from('corner_scores')
+        .select('*')
+        .eq('group_id', group.id)
+        .order('corner_id');
+
+      if (scoresError) {
+        console.error('코너 점수 목록 조회 오류:', scoresError);
+        return NextResponse.json(
+          { success: false, message: '코너 점수 목록 조회에 실패했습니다.' },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({
         success: true,
         data: {
           group: group,
-          // 진행 상황은 클라이언트에서 로컬 스토리지로 관리
-          message: '그룹 정보를 성공적으로 조회했습니다.',
+          cornerScores: cornerScores || [],
         },
-      },
-      { status: 200 }
-    );
+      });
+    }
   } catch (error) {
-    console.error('코너 진행 상황 조회 오류:', error);
+    console.error('코너 점수 조회 오류:', error);
+    return NextResponse.json(
+      { success: false, message: '서버 오류가 발생했습니다.' },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * 코너 점수 수정 API
+ */
+export async function PUT(request: NextRequest) {
+  try {
+    const { groupId, cornerId, score, baseScore, bonusScore, scoreType } =
+      await request.json();
+
+    // 필수 파라미터 검증
+    if (!groupId || !cornerId || score === undefined) {
+      return NextResponse.json(
+        { success: false, message: '필수 파라미터가 누락되었습니다.' },
+        { status: 400 }
+      );
+    }
+
+    // 그룹 존재 여부 확인
+    const { data: group, error: groupError } = await supabase
+      .from('groups')
+      .select('id, score')
+      .eq('group_number', groupId)
+      .single();
+
+    if (groupError || !group) {
+      return NextResponse.json(
+        { success: false, message: '해당 조를 찾을 수 없습니다.' },
+        { status: 404 }
+      );
+    }
+
+    // 기존 코너 점수 조회
+    const { data: existingScore, error: existingError } = await supabase
+      .from('corner_scores')
+      .select('*')
+      .eq('group_id', group.id)
+      .eq('corner_id', cornerId)
+      .single();
+
+    if (existingError) {
+      return NextResponse.json(
+        { success: false, message: '기존 점수를 찾을 수 없습니다.' },
+        { status: 404 }
+      );
+    }
+
+    // 점수 차이 계산
+    const scoreDifference = score - existingScore.score;
+
+    // 그룹 총점 업데이트
+    const newGroupScore = group.score + scoreDifference;
+    const { error: groupUpdateError } = await supabase
+      .from('groups')
+      .update({ score: newGroupScore })
+      .eq('id', group.id);
+
+    if (groupUpdateError) {
+      console.error('그룹 점수 업데이트 오류:', groupUpdateError);
+      return NextResponse.json(
+        { success: false, message: '그룹 점수 업데이트에 실패했습니다.' },
+        { status: 500 }
+      );
+    }
+
+    // 코너 점수 기록 업데이트
+    const { error: updateError } = await supabase
+      .from('corner_scores')
+      .update({
+        score: score,
+        base_score: baseScore || score,
+        bonus_score: bonusScore || 0,
+        score_type: scoreType || 'manual',
+      })
+      .eq('group_id', group.id)
+      .eq('corner_id', cornerId);
+
+    if (updateError) {
+      console.error('코너 점수 업데이트 오류:', updateError);
+      return NextResponse.json(
+        { success: false, message: '코너 점수 업데이트에 실패했습니다.' },
+        { status: 500 }
+      );
+    }
+
+    // group_progress 테이블의 total_score도 업데이트
+    const { error: progressUpdateError } = await supabase
+      .from('group_progress')
+      .upsert(
+        {
+          group_id: group.id,
+          total_score: newGroupScore, // 변경된 그룹 총점과 동기화
+        },
+        {
+          onConflict: 'group_id',
+        }
+      );
+
+    if (progressUpdateError) {
+      console.error('진행 상황 점수 업데이트 오류:', progressUpdateError);
+      // 오류 발생해도 메인 점수 업데이트는 성공으로 처리
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: '점수가 성공적으로 수정되었습니다.',
+      data: {
+        groupId: groupId,
+        cornerId: cornerId,
+        previousScore: existingScore.score,
+        newScore: score,
+        scoreDifference: scoreDifference,
+        newGroupScore: newGroupScore,
+        scoreType: scoreType,
+      },
+    });
+  } catch (error) {
+    console.error('코너 점수 수정 오류:', error);
     return NextResponse.json(
       { success: false, message: '서버 오류가 발생했습니다.' },
       { status: 500 }

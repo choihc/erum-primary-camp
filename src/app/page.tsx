@@ -7,37 +7,11 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { GraduationCap, Users, ShieldCheck, ExternalLink } from 'lucide-react';
-import CurrentProgramStatus from '@/app/CurrentProgramStatus';
+import { Users, ShieldCheck } from 'lucide-react';
 
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-50 to-blue-100">
-      {/* 신청하기 배너 */}
-      <div className="bg-gradient-to-r from-violet-600 to-purple-600 text-white">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="bg-white/20 rounded-full p-2">
-              <GraduationCap className="h-5 w-5" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-sm">
-                2025년 여름성경학교 신청
-              </h3>
-            </div>
-          </div>
-          <a
-            href="https://forms.gle/QTew4otoaSRu6MM69"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="bg-white text-violet-600 px-4 py-2 rounded-md font-semibold text-sm hover:bg-white/90 transition-colors flex items-center space-x-2"
-          >
-            <span>지금 신청하기</span>
-            <ExternalLink className="h-4 w-4" />
-          </a>
-        </div>
-      </div>
-
       <div className="flex items-center justify-center p-4">
         <div className="max-w-4xl w-full space-y-8">
           {/* Header */}
@@ -50,36 +24,8 @@ export default function HomePage() {
             </h2>
           </div>
 
-          {/* 현재 프로그램 상태 */}
-          <CurrentProgramStatus />
-
           {/* App Selection Cards */}
-          <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-            {/* Student App */}
-            <Card className="hover:shadow-lg transition-shadow border-sky-200 bg-white/80 backdrop-blur-sm">
-              <CardHeader className="text-center pb-4">
-                <div className="mx-auto mb-4 p-3 bg-sky-100 rounded-full w-fit">
-                  <GraduationCap className="h-8 w-8 text-sky-600" />
-                </div>
-                <CardTitle className="text-xl text-sky-800">
-                  학생, 학부모
-                </CardTitle>
-                <CardDescription className="text-sky-600">
-                  성경학교 신청, 성경학교 정보 확인 등
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="text-center">
-                <Link href="/s">
-                  <Button
-                    size="lg"
-                    className="w-full bg-sky-500 hover:bg-sky-600 text-white"
-                  >
-                    학생, 학부모 시작하기
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
-
+          <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto">
             {/* Teacher App */}
             <Card className="hover:shadow-lg transition-shadow border-red-200 bg-white/80 backdrop-blur-sm">
               <CardHeader className="text-center pb-4">

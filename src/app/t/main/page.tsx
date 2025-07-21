@@ -17,7 +17,6 @@ import {
   Users,
   BarChart3,
   Edit,
-  Search,
   Clock,
   Shield,
   Bell,
@@ -166,7 +165,7 @@ export default function TeacherMainPage() {
       color: 'bg-blue-500 hover:bg-blue-600',
     },
     {
-      title: '조 현황',
+      title: '점수 현황',
       description: '조별 점수 현황을 그래프로 확인',
       icon: BarChart3,
       href: '/t/status',
@@ -178,13 +177,6 @@ export default function TeacherMainPage() {
       icon: Edit,
       href: '/t/scores',
       color: 'bg-emerald-500 hover:bg-emerald-600',
-    },
-    {
-      title: '구성원 정보열람',
-      description: '교사, 학생 검색 및 상세 정보 확인',
-      icon: Search,
-      href: '/t/students',
-      color: 'bg-violet-500 hover:bg-violet-600',
     },
   ];
 

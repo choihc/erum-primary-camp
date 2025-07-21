@@ -344,73 +344,6 @@ export default function ScoresPage() {
           </Alert>
         )}
 
-        {/* 변경사항 요약 */}
-        {hasChanges && (
-          <Card className="border-amber-200 bg-amber-50/80 backdrop-blur-sm">
-            <CardContent className="p-4">
-              <div className="text-center space-y-4">
-                <div className="flex items-center justify-center space-x-2">
-                  <AlertCircle className="h-5 w-5 text-amber-600" />
-                  <span className="font-medium text-amber-800">
-                    {totalChanges}개 조의 점수가 변경되었습니다
-                  </span>
-                </div>
-                <div className="text-sm text-amber-700 space-y-1">
-                  {Object.entries(scoreChanges)
-                    .filter(([, change]) => change.changed)
-                    .map(([id, change]) => {
-                      const group = groups.find((g) => g.id === parseInt(id));
-                      return (
-                        <div key={id} className="flex justify-center">
-                          <span>
-                            {group?.name}: {change.originalScore} →{' '}
-                            {change.newScore}
-                            {change.newScore > change.originalScore && (
-                              <span className="text-emerald-600 ml-1">
-                                (+{change.newScore - change.originalScore})
-                              </span>
-                            )}
-                            {change.newScore < change.originalScore && (
-                              <span className="text-red-600 ml-1">
-                                ({change.newScore - change.originalScore})
-                              </span>
-                            )}
-                          </span>
-                        </div>
-                      );
-                    })}
-                </div>
-                <div className="flex items-center justify-center space-x-3">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      // Reset all changes
-                      const resetChanges = Object.fromEntries(
-                        Object.entries(scoreChanges).map(([id, sc]) => [
-                          id,
-                          { ...sc, newScore: sc.originalScore, changed: false },
-                        ])
-                      );
-                      setScoreChanges(resetChanges);
-                    }}
-                    className="border-amber-300 text-amber-700 hover:bg-amber-100"
-                  >
-                    전체 취소
-                  </Button>
-                  <Button
-                    onClick={saveScores}
-                    disabled={saving}
-                    className="bg-emerald-500 hover:bg-emerald-600 text-white"
-                  >
-                    {saving ? '저장 중...' : '저장하기'}
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
         {/* 조별 점수 입력 */}
         <div className="grid gap-4 md:grid-cols-2">
           {groups
@@ -440,9 +373,6 @@ export default function ScoresPage() {
                         </Badge>
                       )}
                     </div>
-                    <CardDescription className="text-sky-600">
-                      담당교사: {group.teacher} | 조장: {group.leader}
-                    </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     {/* 현재 점수 표시 */}
@@ -509,7 +439,63 @@ export default function ScoresPage() {
             버튼을 눌러주세요. 저장하지 않으면 변경사항이 반영되지 않습니다.
           </p>
         </div>
+
+        {/* 바텀시트 여백 - 바텀시트가 나타날 때 컨텐츠가 가려지지 않도록 */}
+        {hasChanges && <div className="h-32"></div>}
       </div>
+
+      {/* 바텀시트 - 변경사항이 있을 때만 표시 */}
+      {hasChanges && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-amber-200 shadow-lg z-50 animate-in slide-in-from-bottom duration-300">
+          <div className="max-w-4xl mx-auto p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-amber-100 rounded-full">
+                  <AlertCircle className="h-5 w-5 text-amber-600" />
+                </div>
+                <div>
+                  <div className="font-medium text-amber-800">
+                    {totalChanges}개 조 점수 변경
+                  </div>
+                  <div className="text-sm text-amber-600">
+                    저장하지 않으면 변경사항이 사라집니다
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center space-x-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    // Reset all changes
+                    const resetChanges = Object.fromEntries(
+                      Object.entries(scoreChanges).map(([id, sc]) => [
+                        id,
+                        {
+                          ...sc,
+                          newScore: sc.originalScore,
+                          changed: false,
+                        },
+                      ])
+                    );
+                    setScoreChanges(resetChanges);
+                  }}
+                  className="border-amber-300 text-amber-700 hover:bg-amber-100"
+                >
+                  전체 취소
+                </Button>
+                <Button
+                  onClick={saveScores}
+                  disabled={saving}
+                  className="bg-emerald-500 hover:bg-emerald-600 text-white min-w-[100px]"
+                >
+                  {saving ? '저장 중...' : '저장하기'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
 
     // 인증 성공
     const now = new Date().getTime();
-    const expiry = now + 24 * 60 * 60 * 1000; // 24시간
+    const expiry = now + 7 * 24 * 60 * 60 * 1000; // 7일
 
     return NextResponse.json({
       success: true,

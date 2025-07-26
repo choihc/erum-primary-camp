@@ -206,7 +206,7 @@ export interface ScoreType {
  */
 export const scoreSettings: ScoreType = {
   win: 40,
-  lose: 20,
+  lose: 10,
   draw: 30,
   bonusMax: 5,
 };
